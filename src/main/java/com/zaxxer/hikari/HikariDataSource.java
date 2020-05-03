@@ -42,8 +42,13 @@ public class HikariDataSource extends HikariConfig implements DataSource, Closea
    private static final Logger LOGGER = LoggerFactory.getLogger(HikariDataSource.class);
 
    private final AtomicBoolean isShutdown = new AtomicBoolean();
-
+   /**
+    * 通过构造方法初始化的
+    */
    private final HikariPool fastPathPool;
+   /**
+    * JDBC 连接池，延迟加载的
+    */
    private volatile HikariPool pool;
 
    /**
