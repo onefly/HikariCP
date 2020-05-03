@@ -22,7 +22,7 @@ import java.sql.Statement;
 
 /**
  * This is the proxy class for java.sql.ResultSet.
- *
+ * SQL执行结果的静态代理对象
  * @author Brett Wooldridge
  */
 public abstract class ProxyResultSet implements ResultSet

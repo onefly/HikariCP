@@ -23,15 +23,27 @@ import java.sql.Statement;
 
 /**
  * This is the proxy class for java.sql.Statement.
+ * Statement 对象的静态代理，使用了静态代理模式
  *
  * @author Brett Wooldridge
  */
 public abstract class ProxyStatement implements Statement
 {
+   /**
+    * JDBC代理连接
+    */
    protected final ProxyConnection connection;
+   /**
+    * 被代理的sql执行对象
+    */
    final Statement delegate;
-
+   /**
+    * 是否关闭
+    */
    private boolean isClosed;
+   /**
+    * 被代理的sql执行结果对象
+    */
    private ResultSet proxyResultSet;
 
    ProxyStatement(ProxyConnection connection, Statement statement)

@@ -33,15 +33,28 @@ import static com.zaxxer.hikari.util.ClockSource.currentTime;
 
 /**
  * This is the proxy class for java.sql.Connection.
+ * 静态JDBC连接代理
  *
  * @author Brett Wooldridge
  */
 public abstract class ProxyConnection implements Connection
 {
+   /**
+    * 只读标志位
+    */
    static final int DIRTY_BIT_READONLY   = 0b000001;
+   /**
+    * 自动提交标志位
+    */
    static final int DIRTY_BIT_AUTOCOMMIT = 0b000010;
+   /**
+    * 事务级别标志位
+    */
    static final int DIRTY_BIT_ISOLATION  = 0b000100;
    static final int DIRTY_BIT_CATALOG    = 0b001000;
+   /**
+    * 网络超时标志位
+    */
    static final int DIRTY_BIT_NETTIMEOUT = 0b010000;
    static final int DIRTY_BIT_SCHEMA     = 0b100000;
 
@@ -50,17 +63,38 @@ public abstract class ProxyConnection implements Connection
    private static final Set<Integer> ERROR_CODES;
 
    @SuppressWarnings("WeakerAccess")
+   /**
+    * 目标代理连接对象
+    */
    protected Connection delegate;
-
+   /**
+    * 连接池封装实体对象
+    */
    private final PoolEntry poolEntry;
+   /**
+    * 连接泄露检测任务
+    */
    private final ProxyLeakTask leakTask;
+   /**
+    * 已经打开的sql执行语句
+    */
    private final FastList<Statement> openStatements;
 
    private int dirtyBits;
+   /**
+    * 记录上次访问时间
+    */
    private long lastAccess;
+   /**
+    *  是否要提交当前连接的待提交数据
+    */
    private boolean isCommitStateDirty;
 
    private boolean isReadOnly;
+   /**
+    * 是否自动提交
+    *
+    */
    private boolean isAutoCommit;
    private int networkTimeout;
    private int transactionIsolation;
@@ -194,6 +228,9 @@ public abstract class ProxyConnection implements Connection
       openStatements.remove(statement);
    }
 
+   /**
+    * 标记提交脏数据提交状态，如果设置了自动提交就不用设置，只记录下访问时间
+    */
    final void markCommitStateDirty()
    {
       if (isAutoCommit) {
@@ -204,6 +241,9 @@ public abstract class ProxyConnection implements Connection
       }
    }
 
+   /**
+    * 取消连接泄露检测任务
+    */
    void cancelLeakTask()
    {
       leakTask.cancel();
@@ -222,6 +262,7 @@ public abstract class ProxyConnection implements Connection
       final int size = openStatements.size();
       if (size > 0) {
          for (int i = 0; i < size && delegate != ClosedConnection.CLOSED_CONNECTION; i++) {
+            // try-with-resources 语法 接口实现了AutoCloseable 会自动执行close方法
             try (Statement ignored = openStatements.get(i)) {
                // automatic resource cleanup
             }
@@ -247,12 +288,15 @@ public abstract class ProxyConnection implements Connection
    public final void close() throws SQLException
    {
       // Closing statements can cause connection eviction, so this must run before the conditional below
+      // 关闭执行中的sql
       closeStatements();
 
       if (delegate != ClosedConnection.CLOSED_CONNECTION) {
+         // 取消连接泄露检测任务
          leakTask.cancel();
 
          try {
+            // 配置提交脏数据为是，则回滚当前连接事务
             if (isCommitStateDirty && !isAutoCommit) {
                delegate.rollback();
                lastAccess = currentTime();
@@ -260,6 +304,7 @@ public abstract class ProxyConnection implements Connection
             }
 
             if (dirtyBits != 0) {
+               // 重置JDBC连接状态
                poolEntry.resetConnectionState(this, dirtyBits);
                lastAccess = currentTime();
             }
@@ -488,12 +533,16 @@ public abstract class ProxyConnection implements Connection
    //                         Private classes
    // **********************************************************************
 
+   /**
+    * 关闭状态的连接对象静态工厂
+    */
    private static final class ClosedConnection
    {
       static final Connection CLOSED_CONNECTION = getClosedConnection();
 
       private static Connection getClosedConnection()
       {
+         //创建一个动态代理对象执行处理器，
          InvocationHandler handler = (proxy, method, args) -> {
             final String methodName = method.getName();
             if ("isClosed".equals(methodName)) {

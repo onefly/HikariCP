@@ -26,18 +26,30 @@ import org.slf4j.LoggerFactory;
 /**
  * A Runnable that is scheduled in the future to report leaks.  The ScheduledFuture is
  * cancelled if the connection is closed before the leak time expires.
+ * JDBC连接泄露检测任务代理对象
  *
  * @author Brett Wooldridge
  */
 class ProxyLeakTask implements Runnable
 {
    private static final Logger LOGGER = LoggerFactory.getLogger(ProxyLeakTask.class);
+   /**
+    * 不需要进行内存泄露检测
+    */
    static final ProxyLeakTask NO_LEAK;
-
+   /**
+    * JDBC连接泄露检测延迟任务引用
+    */
    private ScheduledFuture<?> scheduledFuture;
+   /**
+    * 当前连接名字
+    */
    private String connectionName;
+   /**
+    * 异常信息
+    */
    private Exception exception;
-   private String threadName; 
+   private String threadName;
    private boolean isLeaked;
 
    static
@@ -65,18 +77,26 @@ class ProxyLeakTask implements Runnable
    {
    }
 
+   /**
+    * 根据传入的调度执行器服务和延迟启动的时间，创建一个延迟调度任务，并将该任务的引用交接给当前对象
+    * @param executorService
+    * @param leakDetectionThreshold
+    */
    void schedule(ScheduledExecutorService executorService, long leakDetectionThreshold)
    {
       scheduledFuture = executorService.schedule(this, leakDetectionThreshold, TimeUnit.MILLISECONDS);
    }
 
    /** {@inheritDoc} */
+   /**
+    * 到执行时间的时候，如果该任务还没有被取消，可能被泄露了，直接打印连接泄露提示消息
+    */
    @Override
    public void run()
    {
       isLeaked = true;
 
-      final StackTraceElement[] stackTrace = exception.getStackTrace(); 
+      final StackTraceElement[] stackTrace = exception.getStackTrace();
       final StackTraceElement[] trace = new StackTraceElement[stackTrace.length - 5];
       System.arraycopy(stackTrace, 5, trace, 0, trace.length);
 
@@ -84,6 +104,9 @@ class ProxyLeakTask implements Runnable
       LOGGER.warn("Connection leak detection triggered for {} on thread {}, stack trace follows", connectionName, threadName, exception);
    }
 
+   /**
+    * 取消连接泄露检测任务
+    */
    void cancel()
    {
       scheduledFuture.cancel(false);

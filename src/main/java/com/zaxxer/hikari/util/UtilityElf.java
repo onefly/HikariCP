@@ -24,7 +24,7 @@ import static java.lang.Thread.currentThread;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
- *
+ * 常用工具类类实现
  * @author Brett Wooldridge
  */
 public final class UtilityElf
@@ -159,7 +159,7 @@ public final class UtilityElf
       if (transactionIsolationName != null) {
          try {
             // use the english locale to avoid the infamous turkish locale bug
-            final String upperCaseIsolationLevelName = transactionIsolationName.toUpperCase(Locale.ENGLISH);
+            final String upperCaseIsolationLevelName = transactionIsolationName.toUpperCase().toUpperCase(Locale.ENGLISH);
             return IsolationLevel.valueOf(upperCaseIsolationLevelName).getLevelId();
          } catch (IllegalArgumentException e) {
             // legacy support for passing an integer version of the isolation level

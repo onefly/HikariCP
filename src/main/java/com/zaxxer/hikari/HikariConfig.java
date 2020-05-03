@@ -45,22 +45,42 @@ import static com.zaxxer.hikari.util.UtilityElf.safeIsAssignableFrom;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+/**
+ * 连接池基本配置
+ */
 @SuppressWarnings({"SameParameterValue", "unused"})
 public class HikariConfig implements HikariConfigMXBean
 {
    private static final Logger LOGGER = LoggerFactory.getLogger(HikariConfig.class);
 
    private static final char[] ID_CHARACTERS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".toCharArray();
+   /**
+    * 连接超时时间，默认30秒
+    */
    private static final long CONNECTION_TIMEOUT = SECONDS.toMillis(30);
+   /**
+    * 默认检测连接超时时间 默认5秒
+    */
    private static final long VALIDATION_TIMEOUT = SECONDS.toMillis(5);
+   /**
+    * 默认空闲超时时间 默认10分钟
+    */
    private static final long IDLE_TIMEOUT = MINUTES.toMillis(10);
+   /**
+    * 默认最大生存时间，30分钟
+    */
    private static final long MAX_LIFETIME = MINUTES.toMillis(30);
+   /**
+    * 默认连接池大小 10
+    */
    private static final int DEFAULT_POOL_SIZE = 10;
-
+   /**
+    * 是否单元测试
+    */
    private static boolean unitTest = false;
 
    // Properties changeable at runtime through the HikariConfigMXBean
-   //
+   // 运行时通过HikariConfigMXBean动态修改的属性值
    private volatile String catalog;
    private volatile long connectionTimeout;
    private volatile long validationTimeout;
@@ -73,8 +93,9 @@ public class HikariConfig implements HikariConfigMXBean
    private volatile String password;
 
    // Properties NOT changeable at runtime
-   //
+   // 运行时不允许修改的属性
    private long initializationFailTimeout;
+   //连接建立后执行的初始化sql
    private String connectionInitSql;
    private String connectionTestQuery;
    private String dataSourceClassName;
@@ -91,14 +112,25 @@ public class HikariConfig implements HikariConfigMXBean
    private boolean isRegisterMbeans;
    private boolean isAllowPoolSuspension;
    private DataSource dataSource;
+   /**
+    * 数据源相关配置
+    */
    private Properties dataSourceProperties;
    private ThreadFactory threadFactory;
    private ScheduledExecutorService scheduledExecutor;
    private MetricsTrackerFactory metricsTrackerFactory;
+   /**
+    * metric 注册，用于监控
+    */
    private Object metricRegistry;
    private Object healthCheckRegistry;
+   /**
+    * 健康检查相关配置
+    */
    private Properties healthCheckProperties;
-
+   /**
+    * 是否密封的
+    */
    private volatile boolean sealed;
 
    /**
@@ -1103,6 +1135,10 @@ public class HikariConfig implements HikariConfigMXBean
       }
    }
 
+   /**
+    * 根据配置文件名加载配置
+    * @param propertyFileName
+    */
    private void loadProperties(String propertyFileName)
    {
       final File propFile = new File(propertyFileName);

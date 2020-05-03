@@ -16,6 +16,9 @@
 
 package com.zaxxer.hikari.util;
 
+/**
+ * 数据库事务隔离级别定义
+ */
 public enum IsolationLevel
 {
    TRANSACTION_NONE(0),

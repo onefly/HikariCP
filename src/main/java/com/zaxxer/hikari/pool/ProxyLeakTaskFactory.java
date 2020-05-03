@@ -20,31 +20,41 @@ import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * A factory for {@link ProxyLeakTask} Runnables that are scheduled in the future to report leaks.
+ * 创建连接泄露检测任务代理对象的工厂类
  *
  * @author Brett Wooldridge
  * @author Andreas Brenk
  */
-class ProxyLeakTaskFactory
-{
+class ProxyLeakTaskFactory {
+   /**
+    * 具体执行连接泄露检测任务的调度服务
+    */
    private ScheduledExecutorService executorService;
    private long leakDetectionThreshold;
 
-   ProxyLeakTaskFactory(final long leakDetectionThreshold, final ScheduledExecutorService executorService)
-   {
+   ProxyLeakTaskFactory(final long leakDetectionThreshold, final ScheduledExecutorService executorService) {
       this.executorService = executorService;
       this.leakDetectionThreshold = leakDetectionThreshold;
    }
 
-   ProxyLeakTask schedule(final PoolEntry poolEntry)
-   {
+   ProxyLeakTask schedule(final PoolEntry poolEntry) {
       return (leakDetectionThreshold == 0) ? ProxyLeakTask.NO_LEAK : scheduleNewTask(poolEntry);
    }
 
-   void updateLeakDetectionThreshold(final long leakDetectionThreshold)
-   {
+   /**
+    * 更新连接泄露检测阈值，其实就是该延迟任务执行的延迟时间，单位毫秒
+    * @param leakDetectionThreshold
+    */
+   void updateLeakDetectionThreshold(final long leakDetectionThreshold) {
       this.leakDetectionThreshold = leakDetectionThreshold;
    }
 
+   /**
+    * 创建一个新的延时执行连接泄露检测任务
+    *
+    * @param poolEntry
+    * @return
+    */
    private ProxyLeakTask scheduleNewTask(PoolEntry poolEntry) {
       ProxyLeakTask task = new ProxyLeakTask(poolEntry);
       task.schedule(executorService, leakDetectionThreshold);

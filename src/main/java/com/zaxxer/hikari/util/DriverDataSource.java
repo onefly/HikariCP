@@ -30,6 +30,9 @@ import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 数据源驱动
+ */
 public final class DriverDataSource implements DataSource
 {
    private static final Logger LOGGER = LoggerFactory.getLogger(DriverDataSource.class);
@@ -37,7 +40,13 @@ public final class DriverDataSource implements DataSource
    private static final String USER = "user";
 
    private final String jdbcUrl;
+   /**
+    * 数据库驱动配置
+    */
    private final Properties driverProperties;
+   /**
+    * 数据库驱动程序
+    */
    private Driver driver;
 
    public DriverDataSource(String jdbcUrl, String driverClassName, Properties properties, String username, String password)
@@ -57,6 +66,7 @@ public final class DriverDataSource implements DataSource
       }
 
       if (driverClassName != null) {
+         //遍历所有注册过的驱动程序类
          Enumeration<Driver> drivers = DriverManager.getDrivers();
          while (drivers.hasMoreElements()) {
             Driver d = drivers.nextElement();
@@ -67,6 +77,7 @@ public final class DriverDataSource implements DataSource
          }
 
          if (driver == null) {
+            // 如果自动注册的没有找到，尝试手动加载驱动程序类
             LOGGER.warn("Registered driver with driverClassName={} was not found, trying direct instantiation.", driverClassName);
             Class<?> driverClass = null;
             ClassLoader threadContextClassLoader = Thread.currentThread().getContextClassLoader();
@@ -117,7 +128,7 @@ public final class DriverDataSource implements DataSource
 
    @Override
    public Connection getConnection() throws SQLException
-   {
+   {  // 建立数据库连接
       return driver.connect(jdbcUrl, driverProperties);
    }
 
@@ -134,7 +145,6 @@ public final class DriverDataSource implements DataSource
       if (password != null) {
          cloned.put("password", password);
       }
-
       return driver.connect(jdbcUrl, cloned);
    }
 

@@ -30,32 +30,71 @@ import static com.zaxxer.hikari.util.ClockSource.*;
 
 /**
  * Entry used in the ConcurrentBag to track Connection instances.
+ * 连接池内部封装对象，内部封装了数据库连接对象
  *
  * @author Brett Wooldridge
  */
 final class PoolEntry implements IConcurrentBagEntry
 {
    private static final Logger LOGGER = LoggerFactory.getLogger(PoolEntry.class);
+   /**
+    * 这个工具比较有意思，可以实现当前对象某个字段的CAS方式修改，类似于Unfafe的底层调用CAS方法；
+    */
    private static final AtomicIntegerFieldUpdater<PoolEntry> stateUpdater;
-
+   /**
+    * 当前实体持有的数据库连接
+    */
    Connection connection;
+   /**
+    * 上次访问时间
+    */
    long lastAccessed;
+   /**
+    * 上次借用时间
+    */
    long lastBorrowed;
 
    @SuppressWarnings("FieldCanBeLocal")
+   /**
+    * 当前实体状态，状态值在实现接口中定义
+    *       //未使用状态
+    *       int STATE_NOT_IN_USE = 0;
+    *       // 使用中状态
+    *       int STATE_IN_USE = 1;
+    *       // 已删除状态
+    *       int STATE_REMOVED = -1;
+    *       // 保留中状态
+    *       int STATE_RESERVED = -2;
+    */
    private volatile int state = 0;
+   /**
+    * 是否已经被驱逐
+    */
    private volatile boolean evict;
-
+   /**
+    * 当前实体对象生存倒计时
+    */
    private volatile ScheduledFuture<?> endOfLife;
-
+   /**
+    * 已经打开的sql语句执行集合
+    */
    private final FastList<Statement> openStatements;
+   /**
+    * 实体所属的连接池对象引用，方便可以直接根据当前对象进行归还操作，不需要在调用连接池的方法
+    */
    private final HikariPool hikariPool;
-
+   /**
+    * 是否只读模式
+    */
    private final boolean isReadOnly;
+   /**
+    * 是否自动提交模式
+    */
    private final boolean isAutoCommit;
 
    static
    {
+      // 提供了一个更新器，可以CAS方式更新PoolEntry对象中的state字段
       stateUpdater = AtomicIntegerFieldUpdater.newUpdater(PoolEntry.class, "state");
    }
 
@@ -78,6 +117,7 @@ final class PoolEntry implements IConcurrentBagEntry
    {
       if (connection != null) {
          this.lastAccessed = lastAccessed;
+         //调用连接池的归还方法
          hikariPool.recycle(this);
       }
    }
@@ -92,6 +132,12 @@ final class PoolEntry implements IConcurrentBagEntry
       this.endOfLife = endOfLife;
    }
 
+   /**
+    * 获取JDBC连接代理对象
+    * @param leakTask
+    * @param now
+    * @return
+    */
    Connection createProxyConnection(final ProxyLeakTask leakTask, final long now)
    {
       return ProxyFactory.getProxyConnection(this, connection, openStatements, leakTask, now, isReadOnly, isAutoCommit);
@@ -112,11 +158,18 @@ final class PoolEntry implements IConcurrentBagEntry
       return evict;
    }
 
+   /**
+    * 标记当前实体为驱逐状态
+    */
    void markEvicted()
    {
       this.evict = true;
    }
 
+   /**
+    * 进行实际的连接驱逐动作，实际上就是指向连接关闭方法
+    * @param closureReason
+    */
    void evict(final String closureReason)
    {
       hikariPool.closeConnection(this, closureReason);
@@ -168,6 +221,10 @@ final class PoolEntry implements IConcurrentBagEntry
       stateUpdater.set(this, update);
    }
 
+   /**
+    * 关闭封装实体对象中的链接并返回当前关闭的链接
+    * @return
+    */
    Connection close()
    {
       ScheduledFuture<?> eol = endOfLife;

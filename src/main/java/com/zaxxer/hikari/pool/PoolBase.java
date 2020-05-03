@@ -50,19 +50,32 @@ import static com.zaxxer.hikari.util.UtilityElf.createInstance;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+/**
+ * 连接池抽象基类
+ */
 abstract class PoolBase
 {
    private final Logger logger = LoggerFactory.getLogger(PoolBase.class);
-
+   /**
+    * 连接池配置
+    */
    public final HikariConfig config;
    IMetricsTrackerDelegate metricsTracker;
 
    protected final String poolName;
 
    volatile String catalog;
+   /**
+    * 用来记录上次连接失败的异常信息
+    */
    final AtomicReference<Exception> lastConnectionFailure;
-
+   /**
+    * 连接超时时间
+    */
    long connectionTimeout;
+   /**
+    * 检测超时时间
+    */
    long validationTimeout;
 
    SQLExceptionOverride exceptionOverride;
@@ -71,20 +84,49 @@ abstract class PoolBase
    private static final int UNINITIALIZED = -1;
    private static final int TRUE = 1;
    private static final int FALSE = 0;
-
+   // 网络连接超时时间
    private int networkTimeout;
+   /**
+    * 是否支持网络超时设置
+    */
    private int isNetworkTimeoutSupported;
+   /**
+    * 是否支持查询超时
+    */
    private int isQueryTimeoutSupported;
+   /**
+    * more事务隔离级别
+    */
    private int defaultTransactionIsolation;
+   /**
+    * 事务隔离级别
+    */
    private int transactionIsolation;
+   /**
+    * 网络超时检查执行器
+    */
    private Executor netTimeoutExecutor;
+   /**
+    * 数据源
+    */
    private DataSource dataSource;
 
    private final String schema;
+   /**
+    * 是否只读模式
+    */
    private final boolean isReadOnly;
+   /**
+    * 是否自动提交事务
+    */
    private final boolean isAutoCommit;
-
+   /**
+    * 是否使用JDBC检测连接有效性
+    */
    private final boolean isUseJdbc4Validation;
+   /**
+    * 是否隔离内部查询
+    */
    private final boolean isIsolateInternalQueries;
 
    private volatile boolean isValidChecked;
@@ -92,7 +134,7 @@ abstract class PoolBase
    PoolBase(final HikariConfig config)
    {
       this.config = config;
-
+      // 网络连接超时时间默认初始值 -1
       this.networkTimeout = UNINITIALIZED;
       this.catalog = config.getCatalog();
       this.schema = config.getSchema();
@@ -103,6 +145,7 @@ abstract class PoolBase
 
       this.isQueryTimeoutSupported = UNINITIALIZED;
       this.isNetworkTimeoutSupported = UNINITIALIZED;
+      //如果设置了连接检测connection-test-query这个参数，则表示使用不使用JDBC方式valid检测,如果配置了检测sql，则直接通过直线检测sql的方式检测
       this.isUseJdbc4Validation = config.getConnectionTestQuery() == null;
       this.isIsolateInternalQueries = config.isIsolateInternalQueries();
 
@@ -121,12 +164,21 @@ abstract class PoolBase
       return poolName;
    }
 
+   /**
+    * 归还封装的连接池实体对象，具体逻辑有子类实现
+    * @param poolEntry
+    */
    abstract void recycle(final PoolEntry poolEntry);
 
    // ***********************************************************************
    //                           JDBC methods
    // ***********************************************************************
 
+   /**
+    * 偷偷的关闭JDBC链接
+    * @param connection
+    * @param closureReason
+    */
    void quietlyCloseConnection(final Connection connection, final String closureReason)
    {
       if (connection != null) {
@@ -149,12 +201,17 @@ abstract class PoolBase
       }
    }
 
+   /**
+    * 检测连接是否存活，存活的连接返回true
+    * @param connection
+    * @return
+    */
    boolean isConnectionAlive(final Connection connection)
    {
       try {
          try {
             setNetworkTimeout(connection, validationTimeout);
-
+            //可以同配置修改检测超时时间，但是最小值不能超过1秒，否则不予采纳
             final int validationSeconds = (int) Math.max(1000L, validationTimeout) / 1000;
 
             if (isUseJdbc4Validation) {
@@ -201,6 +258,11 @@ abstract class PoolBase
    //                         PoolEntry methods
    // ***********************************************************************
 
+   /**
+    * 创建一个新的连接封装对象
+    * @return
+    * @throws Exception
+    */
    PoolEntry newPoolEntry() throws Exception
    {
       return new PoolEntry(newConnection(), this, isReadOnly, isAutoCommit);
@@ -267,7 +329,7 @@ abstract class PoolBase
 
    /**
     * Register MBeans for HikariConfig and HikariPool.
-    *
+    * 进行Mbeans的注册处理，可以使用使用jconsole控制台动态修连接池配置 和连接池
     * @param hikariPool a HikariPool instance
     */
    void handleMBeans(final HikariPool hikariPool, final boolean register)
@@ -305,6 +367,7 @@ abstract class PoolBase
 
    /**
     * Create/initialize the underlying DataSource.
+    * 初始化数据源
     */
    private void initializeDataSource()
    {
@@ -322,6 +385,7 @@ abstract class PoolBase
          PropertyElf.setTargetFromProperties(ds, dataSourceProperties);
       }
       else if (jdbcUrl != null && ds == null) {
+         // 初始化数据库驱动数据源
          ds = new DriverDataSource(jdbcUrl, driverClassName, dataSourceProperties, username, password);
       }
       else if (dataSourceJNDI != null && ds == null) {
@@ -343,6 +407,7 @@ abstract class PoolBase
 
    /**
     * Obtain connection from data source.
+    * 根据数据源创建一个新的连接
     *
     * @return a Connection connection
     */
@@ -354,12 +419,12 @@ abstract class PoolBase
       try {
          String username = config.getUsername();
          String password = config.getPassword();
-
+         // 如果配置了用户名，则使用带认证的方式获取数据库连接
          connection = (username == null) ? dataSource.getConnection() : dataSource.getConnection(username, password);
          if (connection == null) {
             throw new SQLTransientConnectionException("DataSource returned null unexpectedly");
          }
-
+         // 方法内部包含连接有效性检测，如果检测么有通过则抛出异常
          setupConnection(connection);
          lastConnectionFailure.set(null);
          return connection;
@@ -371,12 +436,13 @@ abstract class PoolBase
          else if (getLastConnectionFailure() == null) {
             logger.debug("{} - Failed to create/setup connection: {}", poolName, e.getMessage());
          }
-
+         //记录连接异常信息
          lastConnectionFailure.set(e);
          throw e;
       }
       finally {
          // tracker will be null during failFast check
+         // 跟踪记录获取连接的时间
          if (metricsTracker != null) {
             metricsTracker.recordConnectionCreated(elapsedMillis(start));
          }
@@ -385,7 +451,7 @@ abstract class PoolBase
 
    /**
     * Setup a connection initial state.
-    *
+    *根据连接设置连接参数
     * @param connection a Connection
     * @throws ConnectionSetupException thrown if any exception is encountered
     */
@@ -420,9 +486,9 @@ abstract class PoolBase
          if (schema != null) {
             connection.setSchema(schema);
          }
-
+         // 执行初始化连接初始化SQL
          executeSql(connection, config.getConnectionInitSql(), true);
-
+         // 设置网络连接超时时间
          setNetworkTimeout(connection, networkTimeout);
       }
       catch (SQLException e) {
@@ -447,7 +513,7 @@ abstract class PoolBase
 
    /**
     * Check whether Connection.isValid() is supported, or that the user has test query configured.
-    *
+    * 判断连接是否有效，两种方式
     * @param connection a Connection to check
     * @throws SQLException rethrown from the driver
     */
@@ -455,9 +521,11 @@ abstract class PoolBase
    {
       try {
          if (isUseJdbc4Validation) {
+            // 是否使用JDBC方式进行有效性检查，默认设置超时时间1秒
             connection.isValid(1);
          }
          else {
+            // 如果配置了检测sql，则执行测试sql执行，并且设置事务不提交，只是判断连接是否可用
             executeSql(connection, config.getConnectionTestQuery(), false);
          }
       }
@@ -469,6 +537,7 @@ abstract class PoolBase
 
    /**
     * Check the default transaction isolation of the Connection.
+    * 检测数据库连接的默认事务跟李级别
     *
     * @param connection a Connection to check
     * @throws SQLException rethrown from the driver
@@ -491,6 +560,7 @@ abstract class PoolBase
 
    /**
     * Set the query timeout, if it is supported by the driver.
+    * 设置sql执行的超时时间
     *
     * @param statement a statement to set the query timeout on
     * @param timeoutSec the number of seconds before timeout
@@ -549,6 +619,7 @@ abstract class PoolBase
    /**
     * Set the network timeout, if <code>isUseNetworkTimeout</code> is <code>true</code> and the
     * driver supports it.
+    * 设置网络连接超时时间
     *
     * @param connection the connection to set the network timeout on
     * @param timeoutMs the number of milliseconds before timeout
@@ -563,6 +634,7 @@ abstract class PoolBase
 
    /**
     * Execute the user-specified init SQL.
+    * 用来执行初始化sql和连接检测sql
     *
     * @param connection the connection to initialize
     * @param sql the SQL to execute
@@ -588,12 +660,19 @@ abstract class PoolBase
       }
    }
 
+   /**
+    * 创建网络超时执行线程池
+    * @param dataSource
+    * @param dsClassName
+    * @param jdbcUrl
+    */
    private void createNetworkTimeoutExecutor(final DataSource dataSource, final String dsClassName, final String jdbcUrl)
    {
       // Temporary hack for MySQL issue: http://bugs.mysql.com/bug.php?id=75615
       if ((dsClassName != null && dsClassName.contains("Mysql")) ||
           (jdbcUrl != null && jdbcUrl.contains("mysql")) ||
           (dataSource != null && dataSource.getClass().getName().contains("Mysql"))) {
+         // 针对mysql驱动，创建了一个同步的执行器，而没有使用异步执行器
          netTimeoutExecutor = new SynchronousExecutor();
       }
       else {
@@ -608,6 +687,7 @@ abstract class PoolBase
 
    /**
     * Set the loginTimeout on the specified DataSource.
+    * 设置数据源的登录超时时间
     *
     * @param dataSource the DataSource
     */
@@ -663,6 +743,9 @@ abstract class PoolBase
    /**
     * Special executor used only to work around a MySQL issue that has not been addressed.
     * MySQL issue: http://bugs.mysql.com/bug.php?id=75615
+    * 同步执行线程池，是个假的线程池, 因为mysql驱动设置超时时间时，只能传入一个异步执行的线程池，由这个线程池在未来某个时间进行异步设置超时时间
+    * ，但是如果用户紧接着关闭了连接，就会出现空指针问题
+    * 所以这里创建了一个同步执行的线程池，由主线程同步执行设置超时操作，就可以避免空指针问题
     */
    private static class SynchronousExecutor implements Executor
    {

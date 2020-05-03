@@ -32,7 +32,7 @@ import java.util.function.UnaryOperator;
 
 /**
  * Fast list without range checking.
- *
+ * 去掉了索引检查
  * @author Brett Wooldridge
  */
 public final class FastList<T> implements List<T>, RandomAccess, Serializable
@@ -228,7 +228,7 @@ public final class FastList<T> implements List<T>, RandomAccess, Serializable
                return elementData[index++];
             }
 
-            throw new NoSuchElementException("No more elements in FastList"); 
+            throw new NoSuchElementException("No more elements in FastList");
          }
       };
    }

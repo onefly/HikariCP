@@ -33,7 +33,7 @@ import com.zaxxer.hikari.HikariConfig;
 
 /**
  * A class that reflectively sets bean properties on a target object.
- *
+ * 利用反射实现的属性设置工具类
  * @author Brett Wooldridge
  */
 public final class PropertyElf

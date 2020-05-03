@@ -6,6 +6,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+/**
+ * 数据库元数据代理对象
+ */
 public abstract class ProxyDatabaseMetaData implements DatabaseMetaData
 {
    protected final ProxyConnection connection;
